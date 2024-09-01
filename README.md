@@ -275,3 +275,225 @@ $$
 $$
 
 
+## 3. Masked Language Modeling (MLM) <a class="anchor" id="4.3"></a>
+
+One of the greatest feature of BERT is the Masked Language Modeling (MLM). The masked language model randomly masks some of the tokens from the input, and the objective is to predict the original vocabulary id of the masked word based only on its context. Unlike left-to-right language model pre-training, the MLM objective allows the representation to fuse the left and the right context, which allows us to pre-train a deep bidirectional Transformer.
+
+
+Before feeding word sequences into BERT, 15% of the words in each sequence are replaced with a [MASK] token. The model then attempts to predict the original value of the masked words, based on the context provided by the other, non-masked, words in the sequence. In technical terms, the prediction of the output words requires:
+
+     1. Adding a classification layer on top of the encoder output.
+     2. Multiplying the output vectors by the embedding matrix, transforming them into the vocabulary dimension.
+     3. Calculating the probability of each word in the vocabulary with softmax.
+     
+ 
+ 
+
+
+
+
+<center><img src = "https://miro.medium.com/max/3300/0*ViwaI3Vvbnd-CJSQ.png" width = 600 height = 600 /></center>
+
+
+
+Here $w_1$,...$w_5$ are the word embedding and $O_1$,..$O_5$ are the outputs of the BERT. BERT uses GELU (Gaussian Error Linear Unit) activation.
+
+$$
+\operatorname{GELU}(x):=x \mathbb{P}(X \leq x)=x \Phi(x)=0.5 x\left(1+\operatorname{erf}\left(\frac{x}{\sqrt{2}}\right)\right)
+$$
+
+The BERT loss function takes into consideration only the prediction of the masked values and ignores the prediction of the non-masked words. As a consequence, the model converges slower than directional models, a characteristic which is offset by its increased context awareness.
+
+The overview of MLM in BERT looks like
+
+
+<center><img src = "http://jalammar.github.io/images/BERT-language-modeling-masked-lm.png" width = 600 height = 600 /></center>
+
+
+
+Some important notes about are the following
+
+- **It is true bi-directional** 
+  
+  Before BERT's MLM, bi-directional means just generating word representation going from left to right and right to left and then simply add or concate the two diretional's representation. For example, if we use bi-directional LSTM, one LSTM goes from left to right generating the representation of the words and other goes from right to left. After that it concatenates generated representation of the words. But it understands less context about the language. But in case of MLM , it masks a word within the text so no need to train the model from the both sides. Besides , the masked word is within the text, so BERT automatically follow those direction to the masked word from the other words.
+  
+
+- **Semi Supervised Training**
+
+  As BERT randomly masks the word from the input text and learn from predicting the masked word, so there is no need to use supervised data with the label. So we can use both unsupervised and supervised data for training the BERT. As semi suprvised data can be used for training the BERT , so we get a huge amount of data for training. It will help us to build more robust and contexual model. 
+  
+
+## 4. Next Sentence Prediction (NSP) <a class="anchor" id="4.4"></a>
+
+If we look back up at the input transformations the OpenAI transformer does to handle different tasks, you’ll notice that some tasks require the model to say something intelligent about two sentences (e.g. are they simply paraphrased versions of each other? Given a wikipedia entry as input, and a question regarding that entry as another input, can we answer that question?).
+
+To make BERT better at handling relationships between multiple sentences, the pre-training process includes an additional task: Given two sentences (A and B), is B likely to be the sentence that follows A, or not?
+
+In the BERT training process, the model receives pairs of sentences as input and learns to predict if the second sentence in the pair is the subsequent sentence in the original document. During training, 50% of the inputs are a pair in which the second sentence is the subsequent sentence in the original document, while in the other 50% a random sentence from the corpus is chosen as the second sentence. The assumption is that the random sentence will be disconnected from the first sentence.
+To help the model distinguish between the two sentences in training, the input is processed in the following way before entering the model:
+- A [CLS] token is inserted at the beginning of the first sentence and a [SEP] token is inserted at the end of each sentence.
+- A sentence embedding indicating Sentence A or Sentence B is added to each token. Sentence embeddings are similar in concept to token embeddings with a vocabulary of 2.
+- A positional embedding is added to each token to indicate its position in the sequence. The concept and implementation of positional embedding are presented in the Transformer paper.
+
+
+
+<center><img src = "https://www.researchgate.net/profile/Akbar-Karimi-4/publication/338934952/figure/fig2/AS:853247933808640@1580441568270/BERT-word-embedding-layer-Devlin-et-al-2018.ppm" width = 550 height = 550 /> </center>
+ 
+ 
+ To predict if the second sentence is indeed connected to the first, the following steps are performed:
+- The entire input sequence goes through the Transformer model. ( input vector size is 768 for each word in BERT base) (**why 768?** the answer given below )
+- Each position outputs a vector of size hidden_size (768 in BERT Base). 
+- The output of the [CLS] token is transformed into a 2×1 shaped vector, using a simple classification layer (learned matrices of weights and biases).
+- Calculating the probability of IsNextSequence (IsNext and NotNext labels) with softmax.
+
+
+For example,
+
+            Input = [CLS] the man went to [MASK] store [SEP] he bought a gallon [MASK] milk [SEP]
+            Label = IsNext
+            Input = [CLS] the man [MASK] to the store [SEP] penguin [MASK] are flight ##less birds [SEP]
+            Label = NotNext
+
+
+When training the BERT model, Masked LM and Next Sentence Prediction are trained together, with the goal of minimizing the combined loss function of the two strategies. Now, the whole BERT model in this looks like
+
+
+
+<center><img src = "http://jalammar.github.io/images/bert-next-sentence-prediction.png" width = 750 height = 750 /></center>
+ 
+ 
+ 
+ 
+ There is a small question **Why the input and the output of a single word holds a 764 dimesion vector in BERT_base model?**
+ 
+ In BERT_base model, it uses 12 attention heads for multi-head attention. So, while we creating multi-head attention, we are using 12 heads for a single word. Each head contains 64 dimension key, query and value vector by which we get 64 dimesion vector with self attention score for a single word. 
+         
+         So, the input and output vector of a single token/word will be = 12 X 64 = 768  dimesion embedding  
+
+
+
+# 5. BERT as Transfer Learning in NLP <a class="anchor" id="5"></a>
+
+As BERT takes unlabeled sentence pair and MLM understands the context of the language better so BERT can be trained on huge dataset which can be used as a pre-trained model in the downstrean tasks. The pre-training procedure largely follows the existing literature on language model pre-training. For the pre-training corpus BERT uses the BooksCorpus (800M words) and English Wikipedia (2,500M words).For Wikipedia author extract only the text passages and ignore lists, tables, and headers. It is critical to use a document-level corpus rather than a shuffled sentence-level corpus such as the Billion Word Benchmark in order to extract long contiguous sequences.
+
+
+
+
+<center><img src = "https://miro.medium.com/max/875/1*-j96GYxnl4f44tD8dJTpng.png" width = 650 height = 650 /> </center>
+ 
+ 
+
+Overall pre-training and fine-tuning procedures for BERT given in the above picture. Apart from output layers, the same architectures are used in both pre-training and fine-tuning. The same pre-trained model parameters are used to initialize
+models for different down-stream tasks. During fine-tuning, all parameters are fine-tuned. [CLS] is a special
+symbol added in front of every input example, and [SEP] is a special separator token (e.g. separating questions/answers). Though BERT is trained on unsupervised data, BERT can be fine tuned on the supervised task.
+
+The whole picture if we use BERT as a pretrained model in a downstream supervised task ( let say question answering task ) will be look like:
+
+
+
+
+<center><img src = "https://www.determined.ai/assets/images/posts/nlp_transfer_learning.png" width = 750 height = 750 /></center>
+ 
+ 
+
+If we want to use BERT for image classification the transfer learning process for BERT will be like 
+
+
+
+
+
+
+<center><img src = "http://jalammar.github.io/images/BERT-classification-spam.png" width = 750 height = 750 /> </center>
+ 
+
+
+ 
+ - **c.  Question Answering Task** <a class="anchor" id="6.3"></a>
+ 
+     For the Question Answering task, BERT takes the input question and passage as a single packed sequence. The input embeddings are the sum of the token embeddings and the segment embeddings.
+ 
+
+<center><img src = "https://miro.medium.com/max/680/1*gwu3JjZ3hM08dIUziSJ3yg.png" width = 400 height = 400 /> </center>
+ 
+ 
+ 
+   To fine-tune BERT for a Question-Answering system, it introduces a start vector and an end vector. The probability of each word being the start-word is calculated by taking a dot product between the final embedding of the word in the passage sequence and the start vector, followed by a softmax over all the words. The word with the highest probability value is considered. A similar process is followed to find the end-word.
+   
+  
+
+<center><img src = "http://www.mccormickml.com/assets/BERT/SQuAD/end_token_classification.png" width = 500 height = 500 /></center>
+ 
+ 
+ We can also apply Multi Layer Perceptrons (MLP) (a.k.a Dense Layers) before calculating the loss with the labels in this downstram tasks before applying the softmax activation. But we apply the MLP or softmax for all the word-token in the passage sequence. If we apply MLP in this task, the whole picture looks like :
+    
+
+<center> <img src = "https://d2l.ai/_images/bert-qa.svg" width = 400 height = 400 /> </center>
+ 
+ 
+ 
+ 
+ 
+ 
+    
+ - **d. Single Sentence Tagging Task** <a class="anchor" id="6.4"></a>
+ 
+     In single sentence tagging tasks such as named entity recognition (where we are given a sentencr and we want fo find the name of anyperson/anything from the sentence)  , a tag must be predicted for every word in the input. The final hidden states (the transformer output) of every input token is fed to the classification layer to get a prediction for every token. Since WordPiece tokenizer breaks some words into sub-words, the prediction of only the first token of a word is considered.
+ 
+ 
+
+<center><img src = "https://yashuseth.files.wordpress.com/2019/06/fig4.png" width = 400 height = 400 /> </center>
+ 
+ 
+ 
+We can also use MLP (a.k.a Dense Layers) before calculating the loss with the labels in this downstram tasks for better result. In this case we apply MLP for each word-token in the sentence except the [CLS] token. If we apply MLP in this task, the whole picture looks like  :
+ 
+
+<center><img src = "https://d2l.ai/_images/bert-tagging.svg" width = 400 height = 400 /> </center>
+ 
+ 
+ 
+ 
+ 
+ # 7. Applications <a class="anchor" id="7"></a>
+
+We have seen the magic of BERT. This is so robust a model that till now it is the most favorite model and also first choice model to solve any NLP task.BERT is undoubtedly a breakthrough in the use of Machine Learning for Natural Language Processing. The fact that it’s approachable and allows fast fine-tuning will likely allow a wide range of practical applications in the future. In this summary, we attempted to describe the main ideas of the paper while not drowning in excessive technical details.
+
+A different variation of BERT is now using in different real-life projects. Models trained on domain/application-specific corpus are Pre-trained models. Training on domain-specific corpus has shown to yield better performance when fine-tuning them on downstream NLP tasks like NER etc. for those domains, in comparison to fine tuning BERT. Some of the variations are listed below that are using different real-world NLP problem
+
+   - RoBERta (robustly optimized BERT for solving different tasks)
+   - BioBERT (use for biomedical text)
+   - SciBERT (use for scientific publications)
+   - ClinicalBERT (use for clinical notes)
+   - G-BERT (use for medical/diagnostic code representation and recommendation)
+   - M-BERT from 104 languages for zero-shot cross-lingual model transfer (task-specific annotations in one language is used to fine-tune a model for evaluation in another language)
+   - ERNIE (knowledge graph) + ERNIE (2) incorporates knowledge into pre-training but by masking entities and phrases using KG.
+   - TransBERT — unsupervised, followed by two supervised steps, for a story ending prediction task
+   - videoBERT (a model that jointly learns video and language representation learning) by representing video frames as special descriptor tokens along with text for pretraining. This is used for video captioning.
+   - DocBERT (use for Document classification)
+   - PatentBERT (Patent classification)
+
+
+
+# 8. References  <a class="anchor" id="8"></a>
+
+- BERT Paper - https://arxiv.org/pdf/1810.04805.pdf
+- OpenAI GPT2 - https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf
+- ULMFit paper - https://arxiv.org/abs/1801.06146
+- ELMo    - https://arxiv.org/abs/1802.05365
+- Transformer - https://arxiv.org/abs/1706.03762
+- Bidreactional RNN/LSTM - https://ieeexplore.ieee.org/document/650093
+- WordPieces Embedding - https://arxiv.org/abs/1609.08144
+- More About Transfromer - https://jalammar.github.io/illustrated-transformer/
+- Bert Explanined - https://towardsdatascience.com/bert-explained-state-of-the-art-language-model-for-nlp-f8b21a9b6270
+- Bert with hugging face - https://towardsdatascience.com/fine-tuning-a-bert-model-with-transformers-c8e49c4e008b
+- Understanding Word Embedding - https://towardsdatascience.com/from-pre-trained-word-embeddings-to-pre-trained-language-models-focus-on-bert-343815627598
+- Illustred bert - http://jalammar.github.io/illustrated-bert/
+- Inside Bert - https://towardsdatascience.com/deconstructing-bert-part-2-visualizing-the-inner-workings-of-attention-60a16d86b5c1
+- Deconstructing Bert  - https://towardsdatascience.com/deconstructing-bert-distilling-6-patterns-from-100-million-parameters-b49113672f77
+- BERT in question answering - https://medium.com/saarthi-ai/build-a-smart-question-answering-system-with-fine-tuned-bert-b586e4cfa5f5
+- Fine Tuning BERT - https://d2l.ai/chapter_natural-language-processing-applications/finetuning-bert.html
+  
+  
+  
+  
+  
