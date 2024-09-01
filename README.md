@@ -191,7 +191,87 @@ It is high time to give a brief description of those parts. First of all, we nee
 
 <h3><center>After the first step, we done our embedding and encoding step just like</center></h3>
 <img src = "https://www.researchgate.net/profile/Akbar-Karimi-4/publication/338934952/figure/fig2/AS:853247933808640@1580441568270/BERT-word-embedding-layer-Devlin-et-al-2018.ppm" width = 550 height = 550 />
+
+
+
+## 2. The Encoders from the transformer <a class="anchor" id="4.2"></a>
+
+The transformer architecture is based on encoder-decoder form. The encoder consists of  four parts ( self attention, multi-head attention, residual connections and normalization and feed forward network ). The encoder of the transformer architecture looks like
+<img src = "https://www.adityaagrawal.net/blog/assets/dnn/bert_encoder.png" width = 200 height = 250 />
+In the encoder architecture we've seen that there are four measure part in the encoder part of the transformer. To understand the whole big picture of the encoder architecture of the transformer the following topics need to understand
+
+        i.   Attention Score Measurement
+        ii.  Self Attention and its intuition
+        iii. Multi Head Attention/ Self Attention
+        iv.  Add & Norm
+         v.  Feed Forward Network
+        
+ Those topics are already covered. Let see a quick recap on those topics.
+ - **i. Attention Score Measurement**
+The attention mechanism is a part of a neural architecture that enables to dynamically highlight relevant features of the input data, which, in NLP, is typically a sequence of textual elements. It can be applied directly to the raw input or to its higher level representation. There are several functions used for measuring attention score ( e.g additive attention score, dot product attention score ). The most common is using dot product attention score by generating query, key , value vector. The function is used for measuring such attention score is given below
+<img src = "https://miro.medium.com/max/3512/1*EphJAS1hwU9NNmUQMxv92w.png" width = 500 height = 600 /> 
+- **ii.  Self Attention and its intuition**
+**Self-attention**, also known as **intra-attention**, is an attention mechanism relating different positions of a single sequence in order to compute a representation of the same sequence.While doing self-attention in transformer, we follow few steps
+
+   - Create three vectors from each of the encoder’s input vectors
+   - For each word, we create a Query vector, a Key vector, and a Value vector
+   - These vectors are created by multiplying the embedding by three matrices that we trained during the training process.
+   
+ <img src = "https://lh5.googleusercontent.com/-PLfe9_p8Y4dySneLd-hNCtPkXiOK3oKh_TG_oZV-TMVEXXkfBe7_tX2DnFWAcVNQGpDlehwJJDlyH88F9-RMtCOszNYfj3ixhsuwcC1avfMDHS7yXTLgQaoYgRN5ak1K34qiz8lv78" width = 500 height = 600 />
+  
+We need to generate three vectors ($Q$,$K$ and $V$) for each word embedding because we need to find the attention score for each word with all the words in the input sequence where the word belongs to.
+We will generate three vectors ($Q$,$K$ and $V$) for each word embedding by multiplying the word embedding with three weight metrics ($W_Q$,$W_K$,$W_V$). The metrics will be learned by model via backpropagation.  
+
  
-    
-    
+ <img src = "https://jalammar.github.io/images/t/self-attention-matrix-calculation.png" width = 400 height = 400 />
+Notice that these new vectors are smaller in dimension than the embedding vector. Their dimensionality is 64, while the embedding and encoder input/output vectors have a dimensionality of 512.
+**Why is dimensionality 64?**
+As we must have :
+
+   - Output’s dimension is [length of input sequences] x [dimension of embeddings — 512]
+
+   - We use 8 heads during the Multi-head Self-Attention process. The output size of a given self-attention vector is [length of input sequences] x [64]. So the concatenated vector resulting from all Multi-head Self-Attention process would be [length of input sequences] x ([64] x [8]) = [length of input sequences] x ([512])
+
+
+So, we will get a 64 dimension query, key, and value vector for each word. An example is given below:
+<img src = "https://miro.medium.com/max/3000/1*yw2PxgzsjNNKE-UaVoZESQ.png" width = 1000 height = 1000 />
+<img src = "https://miro.medium.com/max/3000/1*R9NE3rNKGO1ThN2jhZYBRg.png" width = 600 height = 600 />
+
+- **iii. Multi Head Attention**
+Multi-head attention means keeping attention to multiple words in a sequence for a single word. Multi-head attention is a module for attention mechanisms which runs through an attention mechanism several times in parallel. Intuitively, multiple attention heads allows for attending to parts of the sequence differently ( e.g. longer term dependencies versus shorter-term dependencies ).
+**Why do we need multi head attention ?**
+While we are doing self attention, we will observe that a word by itself gets much more attention rather than the attention score with the other words. It may hamper the model to understand the context. So if we measure the self attention score multiple times we will reduce this problem a little bit. 
+<img src = "https://miro.medium.com/max/1270/1*LpDpZojgoKTPBBt8wdC4nQ.png" width = 500 height = 500 />
+<img src = "https://jalammar.github.io/images/t/transformer_multi-headed_self-attention-recap.png" width = 900 height = 900 />
+<h3><center>Till now the whole picture is like that</center></h3>.
+<img src = "https://miro.medium.com/max/3000/1*tbb9rywOeo3kBtJ85ZdPFA.png" width = 900 height = 900 />
+<img src = "https://miro.medium.com/max/3000/1*mllxBXok93AsQ_m43D3v_g.png" width = 900 height = 900 />
+- **iv. Add and Norm**
+ Here Add means the residual connection and norm mean the layer normalization. It also use dropout in this layer to reduce overfitting.
+
+$$
+\text{ Layer Norm }(x+\text{Dropout}(\text{ Sublayer}(x)))
+$$
+
+
+To have a clear look let consider the following example
+<img src = "http://jalammar.github.io/images/t/encoder_with_tensors.png" width = 500 height = 500 />
+Here, Self attention is the sublayer and X = [x1, x2] , Z = [z1, z2]
+Now, Layernorm changes input to have mean 0 , variance 1 per layer and per training point (and adds two more parameters). The equation of the layer normalization
+\mu^{l}=\frac{1}{H} \sum_{i=1}^{H} a_{i}^{l}
+$$
+
+$$\quad h_{i}=f\left(\frac{g_{i}}{\sigma_{i}}\left(a_{i}-\mu_{i}\right)+b_{i}\right)$$
+
+$$\quad \sigma^{l}=\sqrt{ \frac{1}{H} \sum_{i=1}^{H}\left(a_{i}^{l}-\mu^{l}\right)^{2} }$$
+
+
+
+Here $l$ is the layer, $\mu$ is the mean, $\sigma$ is the variance.
+- **v. Feed Forward Network**
+In addition to attention sub-layers, each of the layers in our encoder and decoder contains a fully connected feed-forward network, which is applied to each position separately and identically. This consists of two linear transformations with a ReLU activation in between.This can be simplified by the equation
+$$
+\operatorname{FFN}(x)=\max \left(0, x W_{1}+b_{1}\right) W_{2}+b_{2}
+$$
+
 
